@@ -1,5 +1,5 @@
-WSRPC
-=====
+WSRPC Tornado
+=============
 
 Remote Procedure call through WebSocket between browser and tornado.
 

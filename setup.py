@@ -12,7 +12,7 @@ __author__ = 'Dmitry Orlov <me@mosquito.su>'
 
 
 setup(
-    name='wsrpc',
+    name='wsrpc-tornado',
     version=__version__,
     author=__author__,
     author_email='me@mosquito.su',
