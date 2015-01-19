@@ -3,6 +3,17 @@ WSRPC Tornado
 
 Remote Procedure call through WebSocket between browser and tornado.
 
+Installation
+------------
+
+Install via pip::
+
+	pip install wsrpc-tornado
+
+
+Simple usage
+------------
+
 Add the backend side::
 
 	from time import time
@@ -48,3 +59,12 @@ Add the frontend side::
 
 		RPC.call('test2').then(function (data) { console.log(data); }).done();
 	</script>
+
+
+Example
++++++++
+
+Example running there demo_.
+
+
+.. _demo: http://wsrpc.mosquito.su/
