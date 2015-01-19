@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>wsRPC</title>
+	<script type="text/javascript" src="/js/q.min.js"></script>
+	<script type="text/javascript" src="/js/wsrpc.min.js"></script>
+	<script type="text/javascript">
+		(function (global) {
+        var addr = document.URL.split("/")[2];
+        var schema = document.URL.split("/")[0].replace(':', '');
+
+        global.ADDRESS = {
+	        schema: schema,
+		     address: addr
+        };
+		})(this);
+
+		var CONNECTION = {
+			protocol: 'ws://',
+			host: ADDRESS.address,
+			prefix: '/ws/',
+			retryTimeout: 5000,
+			toString: function () {
+				return this.protocol + this.host + this.prefix;
+			}
+		};
+		RPC = WSRPC(CONNECTION.toString(), CONNECTION.retryTimeout);
+		RPC.connect();
+
+		function onResponse(resp) {
+			var out = document.getElementById('response');
+
+			try {
+				out.innerHTML = JSON.stringify(resp, 1, 1);
+			} catch (e) { alert(e); }
+		}
+
+		function test() {
+			var fn = document.getElementById('func').value;
+			var args = JSON.parse(document.getElementById('args').value);
+
+			RPC.call(fn, args).then(onResponse, function (error) {alert(error);}).done();
+		}
+
+		RPC.addRoute('joke', function (data) {
+			return confirm(data.joke + '\n\nThat was funny?');
+		});
+	</script>
+	<link rel="stylesheet" href="just-grid.css"/>
+	<style>
+		body {
+			font-family: "Arial", serif;
+			font-size: 18px;
+			margin: 10px;
+		}
+		#func, #args, button {
+			width: 99%;
+			height: 35px;
+			font-size: 20px;
+			border: 1px solid black;
+			border-radius: 3px;
+			float: left;
+			padding: 5px;
+			box-sizing: border-box;
+		}
+		#response {
+			width: 100%;
+			height: 200px;
+			box-sizing: border-box;
+			background: #aeaeae;
+			border: 1px solid black;
+			overflow: auto;
+			border-radius: 10px;
+			padding: 10px;
+		}
+		button.example {
+			width: 25%;
+		}
+
+	</style>
+</head>
+<body>
+	<div class="grid">
+		<div class="row">
+			<div class="col4">Function:</div>
+			<div class="col4 post4">Arguments:</div>
+		</div>
+		<div class="row">
+			<div class="col4"><input type="search" id="func" value="test"/></div>
+			<div class="col4"><input type="text" id="args" value='{"key": "value"}'/></div>
+			<div class="col4"><button onclick="test()">Call</button></div>
+		</div>
+		<div class="row"><div style="padding: 30px;" class="col12"><pre id="response"></pre></div></div>
+		<div class="row" id="examples"></div>
+	</div>
+	<script>
+		examples = {
+			'test': '{"key": "value"}',
+			'test.delayed': '{"delay": 2}',
+			'test.exception': '{"Not":"existing method"}',
+			'test.getEpoch': '{}',
+			'test._secure_method': '{}',
+			'test.requiredArgument': '{}',
+			'test.getJoke': '{}'
+		};
+
+		var examplesContainer = document.getElementById('examples');
+
+		for (var func in examples) {
+			var args = examples[func];
+			var btn = document.createElement('button');
+			btn.setAttribute('class', 'example');
+			btn.func = func;
+			btn.args = args;
+			btn.innerHTML = func;
+			btn.onclick = function () {
+				document.getElementById('func').setAttribute('value', this.func);
+				document.getElementById('args').setAttribute('value', this.args);
+			};
+			examplesContainer.appendChild(btn);
+		}
+</script>
+</body>
+</html>
