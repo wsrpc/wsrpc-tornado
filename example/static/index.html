@@ -6,26 +6,8 @@
 	<script type="text/javascript" src="/js/q.min.js"></script>
 	<script type="text/javascript" src="/js/wsrpc.min.js"></script>
 	<script type="text/javascript">
-		(function (global) {
-        var addr = document.URL.split("/")[2];
-        var schema = document.URL.split("/")[0].replace(':', '');
-
-        global.ADDRESS = {
-	        schema: schema,
-		     address: addr
-        };
-		})(this);
-
-		var CONNECTION = {
-			protocol: 'ws://',
-			host: ADDRESS.address,
-			prefix: '/ws/',
-			retryTimeout: 5000,
-			toString: function () {
-				return this.protocol + this.host + this.prefix;
-			}
-		};
-		RPC = WSRPC(CONNECTION.toString(), CONNECTION.retryTimeout);
+		var url = window.location.protocol==="https:"?"wss://":"ws://" + window.location.host + '/ws/';
+		RPC = WSRPC(url, 5000);
 		RPC.connect();
 
 		function onResponse(resp) {

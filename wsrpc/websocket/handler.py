@@ -112,8 +112,7 @@ class WebSocket(tornado.websocket.WebSocketHandler):
         self.id = str(uuid.uuid4())
 
     def _log_client_list(self):
-        lst = ['\n\t{0}'.format(str(i)) for i in self._CLIENTS.iteritems()]
-        log.debug(Lazy(lambda: 'CLIENTS: {0}'.format(''.join(lst))))
+        log.debug(Lazy(lambda: 'CLIENTS: {0}'.format(''.join(['\n\t%r' % i for i in self._CLIENTS.values()]))))
 
     @classmethod
     def on_pong(self, data):
@@ -322,7 +321,7 @@ class WebSocket(tornado.websocket.WebSocketHandler):
 
     def __repr__(self):
         if hasattr(self, 'id'):
-            return "<RPCWebSocket: ID:{0}>".format(self.id)
+            return "<RPCWebSocket: ID[{0}]>".format(self.id)
         else:
             return "<RPCWebsocket: {0} (waiting)>".format(self.__hash__())
 
