@@ -7,7 +7,7 @@ except ImportError:
     from distutils.core import setup
 
 
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 __author__ = 'Dmitry Orlov <me@mosquito.su>'
 
 
@@ -26,5 +26,6 @@ setup(
     ],
     long_description=open('README.rst').read(),
     packages=['wsrpc', 'wsrpc.websocket',],
+    package_data={ 'wsrpc': ['static/*'], },
     install_requires = ['tornado'],
 )
