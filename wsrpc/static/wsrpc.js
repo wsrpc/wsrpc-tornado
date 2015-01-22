@@ -196,7 +196,7 @@
 							}
 						}
 					} catch (exception) {
-						err = {
+						var err = {
 							data: exception.message,
 							type: 'error',
 							serial: data?data.serial:null
