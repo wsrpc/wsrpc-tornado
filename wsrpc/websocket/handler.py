@@ -176,7 +176,7 @@ class WebSocket(tornado.websocket.WebSocketHandler):
         raise NotImplementedError('Callback function not implemented')
 
     def open(self):
-        log.info('Client connected: {0}'.format(self))
+        tornado.ioloop.IOLoop.instance().call_later(0, lambda: log.info('Client connected: {0}'.format(self)))
         self._get_id()
         self._CLIENTS[self.id] = self
         self._log_client_list()
