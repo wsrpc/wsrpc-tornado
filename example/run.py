@@ -89,6 +89,7 @@ def main():
     http_server = tornado.httpserver.HTTPServer(Application())
     http_server.listen(options.port, address=options.listen)
     log.info('Server started {host}:{port}'.format(host=options.listen, port=options.port))
+    WebSocket.cleapup_worker() # Ping and clean dead sockets
     tornado.ioloop.IOLoop.instance().start()
 
 
