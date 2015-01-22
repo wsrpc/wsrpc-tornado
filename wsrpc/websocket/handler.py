@@ -138,19 +138,20 @@ class WebSocket(tornado.websocket.WebSocketHandler):
                 if hasattr(socket, 'on_pong'):
                     delattr(socket, 'on_pong')
 
-            tornado.ioloop.IOLoop.instance().call_later(0, _timeout)
+            tornado.ioloop.IOLoop.instance().call_later(timeout, _timeout)
             return _ping_waiter
 
-        for id, socket in cls._CLIENTS.iteritems():
-            try:
-                # send low-level ping
-                if isinstance(socket.ws_connection, tornado.websocket.WebSocketProtocol13):
-                    socket.ping("\0" * 8)
-                    socket.on_pong = timeout_waiter(socket, cls._CLIENT_TIMEOUT)
-                else:
-                    socket.call('ping', data="ping", callback=timeout_waiter(socket, cls._CLIENT_TIMEOUT))
-                    sleep(cls._CLIENT_TIMEOUT)
+        def do_ping(socket):
+            if isinstance(socket.ws_connection, tornado.websocket.WebSocketProtocol13):
+                socket.ping("\0" * 8)
+                socket.on_pong = timeout_waiter(socket, cls._CLIENT_TIMEOUT)
+            else:
+                socket.call('ping', data="ping", callback=timeout_waiter(socket, cls._CLIENT_TIMEOUT))
+                sleep(cls._CLIENT_TIMEOUT)
 
+        for sid, socket in cls._CLIENTS.iteritems():
+            try:
+                do_ping(socket)
             except tornado.websocket.WebSocketClosedError:
                 socket.close()
                 log.warning('Auto close dead socket: %r', socket)
