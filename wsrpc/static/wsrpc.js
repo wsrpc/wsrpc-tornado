@@ -2,6 +2,7 @@
 	function WSRPCConstructor (URL, reconnectTimeout) {
 		var self = this;
 		self.serial = 1;
+		self.connectionNumber = 1;
 		self.eventId = 0;
 		self.socketStarted = false;
 		self.eventStore = {
@@ -76,6 +77,8 @@
 			var ws = new WebSocket(URL);
 
 			var rejectQueue = function () {
+				self.connectionNumber++; // rejects incoming calls
+				
 				while (0 < self.callQueue.length) {
 					var callObj = self.callQueue.shift();
 					var deferred = self.store[callObj.serial];
@@ -166,12 +169,16 @@
 								throw Error('Route not found');
 							}
 
-							out = {
-								serial: data.serial,
-								type: 'callback',
-								data: self.routes[data.call](data.arguments)
-							};
-							self.socket.send(JSON.stringify(out));
+							var connectionNumber = self.connectionNumber;
+							Q(self.routes[data.call](data.arguments)).then(function(result) {
+								if (connectionNumber !== self.connectionNumber) return;
+								out = {
+									serial: data.serial,
+									type: 'callback',
+									data: result
+								};
+								self.socket.send(JSON.stringify(out));
+							});
 						} else if (data.hasOwnProperty('type') && data.type === 'error') {
 							if (!self.store.hasOwnProperty(data.serial)) {
 								return log('Unknown callback');
