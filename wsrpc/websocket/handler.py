@@ -39,7 +39,7 @@ class WebSocket(tornado.websocket.WebSocketHandler):
     _KEEPALIVE_PING_TIMEOUT = 30
     _CLIENT_TIMEOUT = 10
 
-    THREAD_POOL = ThreadPool(cpu_count() * 2)
+    THREAD_POOL = ThreadPool(10 if cpu_count() < 10 else cpu_count() * 2)
 
     def _execute(self, transforms, *args, **kwargs):
         if self.authorize():
@@ -120,6 +120,7 @@ class WebSocket(tornado.websocket.WebSocketHandler):
 
     @classmethod
     def _cleanup(cls):
+        # TODO: Do it async
         def timeout_waiter(socket, timeout):
             flags = []
 
