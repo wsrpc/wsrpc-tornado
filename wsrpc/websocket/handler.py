@@ -141,27 +141,24 @@ class WebSocket(tornado.websocket.WebSocketHandler):
             tornado.ioloop.IOLoop.instance().call_later(0, _timeout)
             return _ping_waiter
 
-        while True:
-            sleep(cls._KEEPALIVE_PING_TIMEOUT)
-            for id, socket in cls._CLIENTS.iteritems():
-                try:
-                    # send low-level ping
-                    if isinstance(socket.ws_connection, tornado.websocket.WebSocketProtocol13):
-                        socket.ping("\0" * 8)
-                        socket.on_pong = timeout_waiter(socket, cls._CLIENT_TIMEOUT)
-                    else:
-                        socket.call('ping', data="ping", callback=timeout_waiter(socket, cls._CLIENT_TIMEOUT))
-                        sleep(cls._CLIENT_TIMEOUT)
+        for id, socket in cls._CLIENTS.iteritems():
+            try:
+                # send low-level ping
+                if isinstance(socket.ws_connection, tornado.websocket.WebSocketProtocol13):
+                    socket.ping("\0" * 8)
+                    socket.on_pong = timeout_waiter(socket, cls._CLIENT_TIMEOUT)
+                else:
+                    socket.call('ping', data="ping", callback=timeout_waiter(socket, cls._CLIENT_TIMEOUT))
+                    sleep(cls._CLIENT_TIMEOUT)
 
-                except tornado.websocket.WebSocketClosedError:
-                    socket.close()
-                    log.warning('Auto close dead socket: %r', socket)
-                except Exception as e:
-                    log.debug(Lazy(lambda: traceback.format_exc()))
-                    log.error('%r', e)
+            except tornado.websocket.WebSocketClosedError:
+                socket.close()
+                log.warning('Auto close dead socket: %r', socket)
+            except Exception as e:
+                log.debug(Lazy(lambda: traceback.format_exc()))
+                log.error('%r', e)
 
-            log.debug('Cleanup loop is OK.')
-        log.debug('Cleanup log exitted')
+        log.debug('Cleanup loop is OK.')
 
     def _to_json(self, **kwargs):
         return json.dumps(kwargs, default=repr, sort_keys=False, indent=None, ensure_ascii=False, encoding='utf-8')
