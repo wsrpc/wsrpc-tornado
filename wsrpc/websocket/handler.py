@@ -120,7 +120,6 @@ class WebSocket(tornado.websocket.WebSocketHandler):
 
     @classmethod
     def _cleanup(cls):
-        # TODO: Do it async
         def timeout_waiter(socket, timeout):
             flags = []
 
@@ -129,7 +128,6 @@ class WebSocket(tornado.websocket.WebSocketHandler):
                 log.debug('Socket "%r" ping OK', socket)
 
             def _timeout():
-                sleep(timeout)
                 if not flags:
                     try:
                         log.warning('Socket "%r" must be closed', socket)
@@ -140,7 +138,7 @@ class WebSocket(tornado.websocket.WebSocketHandler):
                 if hasattr(socket, 'on_pong'):
                     delattr(socket, 'on_pong')
 
-            cls.THREAD_POOL.apply_async(_timeout)
+            tornado.ioloop.IOLoop.instance().call_later(0, _timeout)
             return _ping_waiter
 
         while True:
@@ -337,5 +335,7 @@ class WebSocket(tornado.websocket.WebSocketHandler):
 
     @classmethod
     def cleapup_worker(cls):
-        cls.THREAD_POOL.apply_async(cls._cleanup)
-
+        def run():
+            cls.THREAD_POOL.apply_async(cls._cleanup)
+            tornado.ioloop.IOLoop.instance().call_later(cls._KEEPALIVE_PING_TIMEOUT, run)
+        tornado.ioloop.IOLoop.instance().call_later(0, run)
