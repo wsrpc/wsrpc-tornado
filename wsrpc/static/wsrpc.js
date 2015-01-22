@@ -166,12 +166,14 @@
 								throw Error('Route not found');
 							}
 
-							out = {
-								serial: data.serial,
-								type: 'callback',
-								data: self.routes[data.call](data.arguments)
-							};
-							self.socket.send(JSON.stringify(out));
+							Q(self.routes[data.call](data.arguments)).then(function(result) {
+								out = {
+									serial: data.serial,
+									type: 'callback',
+									data: result
+								};
+								self.socket.send(JSON.stringify(out));
+							});
 						} else if (data.hasOwnProperty('type') && data.type === 'error') {
 							if (!self.store.hasOwnProperty(data.serial)) {
 								return log('Unknown callback');
