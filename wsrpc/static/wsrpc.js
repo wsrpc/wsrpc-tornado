@@ -168,29 +168,16 @@
 								throw Error('Route not found');
 							}
 
-							function reply (serial, result) {
-								out = {
-										serial: serial,
+							var connectionNumber = self.connectionNumber;
+							Q(self.routes[data.call](data.arguments)).then(function(promisedResult) {
+								if (connectionNumber == self.connectionNumber) {
+									self.socket.send(JSON.stringify({
+										serial: data.serial,
 										type: 'callback',
-										data: result
-									};
-									self.socket.send(JSON.stringify(out));
-							}
-
-							var result = self.routes[data.call](data.arguments);
-							if ('then' in result) {
-								var connectionNumber = self.connectionNumber;
-								result.then(function(promisedResult) {
-									if (connectionNumber !== self.connectionNumber) {
-										log("Got callback for closed connection");
-										return;
-									} else {
-										reply(data.serial, promisedResult);
-									}
-								});
-							} else {
-								reply(data.serial, result)
-							}
+										data: promisedResult
+									}));
+								}
+							}).done();
 						} else if (data.hasOwnProperty('type') && data.type === 'error') {
 							if (!self.store.hasOwnProperty(data.serial)) {
 								return log('Unknown callback');
