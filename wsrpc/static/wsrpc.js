@@ -2,7 +2,6 @@
 	function WSRPCConstructor (URL, reconnectTimeout) {
 		var self = this;
 		self.serial = 1;
-		self.connectionNumber = 1;
 		self.eventId = 0;
 		self.socketStarted = false;
 		self.eventStore = {
@@ -11,7 +10,7 @@
 			onclose: {},
 			onchange: {}
 		};
-
+		self.connectionNumber = 0;
 		self.oneTimeEventStore = {
 			onconnect: [],
 			onerror: [],
@@ -78,7 +77,7 @@
 
 			var rejectQueue = function () {
 				self.connectionNumber++; // rejects incoming calls
-				
+
 				while (0 < self.callQueue.length) {
 					var callObj = self.callQueue.shift();
 					var deferred = self.store[callObj.serial];
@@ -169,16 +168,29 @@
 								throw Error('Route not found');
 							}
 
-							var connectionNumber = self.connectionNumber;
-							Q(self.routes[data.call](data.arguments)).then(function(result) {
-								if (connectionNumber !== self.connectionNumber) return;
+							function reply (serial, result) {
 								out = {
-									serial: data.serial,
-									type: 'callback',
-									data: result
-								};
-								self.socket.send(JSON.stringify(out));
-							});
+										serial: serial,
+										type: 'callback',
+										data: result
+									};
+									self.socket.send(JSON.stringify(out));
+							}
+
+							var result = self.routes[data.call](data.arguments);
+							if ('then' in result) {
+								var connectionNumber = self.connectionNumber;
+								result.then(function(promisedResult) {
+									if (connectionNumber !== self.connectionNumber) {
+										log("Got callback for closed connection");
+										return;
+									} else {
+										reply(data.serial, promisedResult);
+									}
+								});
+							} else {
+								reply(data.serial, result)
+							}
 						} else if (data.hasOwnProperty('type') && data.type === 'error') {
 							if (!self.store.hasOwnProperty(data.serial)) {
 								return log('Unknown callback');
