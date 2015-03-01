@@ -9,6 +9,7 @@ import uuid
 import tornado.websocket
 import tornado.ioloop
 import tornado.escape
+import tornado.gen
 import types
 from functools import partial
 from time import sleep
@@ -43,7 +44,7 @@ class WebSocket(tornado.websocket.WebSocketHandler):
 
     def _execute(self, transforms, *args, **kwargs):
         if self.authorize():
-            super(WebSocket, self)._execute(transforms, *args, **kwargs)
+            return super(WebSocket, self)._execute(transforms, *args, **kwargs)
         else:
             self.stream.write(tornado.escape.utf8(
                 "HTTP/1.1 403 Forbidden\r\n\r\n"
@@ -290,6 +291,11 @@ class WebSocket(tornado.websocket.WebSocketHandler):
                 log.error(repr(data))
                 self.locks.remove(serial)
                 return self._send(data=repr(data), serial=serial, type='error')
+            elif isinstance(data, tornado.gen.Future):
+                if data.running():
+                    data.add_done_callback(response)
+                else:
+                    return responder(data.result())
             else:
                 self.locks.remove(serial)
                 return self._send(data=data, serial=serial, type='callback')
