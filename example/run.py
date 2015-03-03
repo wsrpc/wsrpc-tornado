@@ -5,6 +5,7 @@ import uuid
 import tornado.web
 import tornado.httpserver
 import tornado.ioloop
+import tornado.gen
 
 from random import randint
 from time import sleep, time
@@ -59,9 +60,12 @@ class TestRoute(WebSocketRoute):
     def init(self, **kwargs):
         return kwargs
 
+    @tornado.gen.coroutine
     def delayed(self, delay=0):
-        sleep(delay)
-        return "I'm delayed {0} seconds".format(delay)
+        future = tornado.gen.Future()
+        tornado.ioloop.IOLoop.instance().call_later(delay, lambda: future.set_result(True))
+        yield future
+        raise tornado.gen.Return("I'm delayed {0} seconds".format(delay))
 
     def getEpoch(self):
         return time()
@@ -72,13 +76,13 @@ class TestRoute(WebSocketRoute):
     def _secure_method(self):
         return 'WTF???'
 
-    def _feedback(self, res):
-        log.info('Client said that was "{0}"'.format('awesome' if res else 'awful'))
-
+    @tornado.gen.coroutine
     def getJoke(self):
         joke = self.JOKES[randint(0, len(self.JOKES) - 1)]
-        self.socket.call('joke', callback=self._feedback, joke=joke)
-        return "Ok."
+        result = yield self.socket.call('joke', joke=joke)
+        log.info('Client said that was "{0}"'.format('awesome' if result else 'awful'))
+        yield self.socket.call('print', result='Cool' if result else 'Hmm.. Try again.')
+        raise tornado.gen.Return("Ok.")
 
 
 WebSocket.ROUTES['test'] = TestRoute
@@ -89,7 +93,6 @@ def main():
     http_server = tornado.httpserver.HTTPServer(Application())
     http_server.listen(options.port, address=options.listen)
     log.info('Server started {host}:{port}'.format(host=options.listen, port=options.port))
-    WebSocket.cleapup_worker() # Ping and clean dead sockets
     tornado.ioloop.IOLoop.instance().start()
 
 

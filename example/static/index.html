@@ -25,6 +25,8 @@
 			RPC.call(fn, args).then(onResponse, function (error) {alert(error);}).done();
 		}
 
+		RPC.addRoute('print', onResponse);
+
 		RPC.addRoute('joke', function (data) {
 			return confirm(data.joke + '\n\nThat was funny?');
 		});

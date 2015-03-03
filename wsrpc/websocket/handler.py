@@ -2,21 +2,40 @@
 from multiprocessing.pool import ThreadPool
 from multiprocessing import cpu_count
 import zlib
-import json
-import logging
+import time
 import traceback
 import uuid
+import struct
 import tornado.websocket
 import tornado.ioloop
 import tornado.escape
 import tornado.gen
 import types
 from functools import partial
-from time import sleep
 from tornado.log import app_log as log
 from .route import WebSocketRoute
 from .common import log_thread_exceptions
 
+
+try:
+    dict.iteritems
+except AttributeError:
+    # Python 3
+    def itervalues(d):
+        return iter(d.values())
+    def iteritems(d):
+        return iter(d.items())
+else:
+    # Python 2
+    def itervalues(d):
+        return d.itervalues()
+    def iteritems(d):
+        return d.iteritems()
+
+try:
+    import ujson as json
+except ImportError:
+    import json
 
 class Lazy(object):
     def __init__(self,func):
@@ -30,7 +49,49 @@ def ping(obj, *args, **kwargs):
     return 'pong'
 
 
-class WebSocket(tornado.websocket.WebSocketHandler):
+class LockError(Exception):
+    pass
+
+
+class Lock(object):
+    def __init__(self, locks_set, lock):
+        self.__partial = partial(locks_set.remove, lock)
+        if lock in locks_set:
+            raise LockError("Object %r already locked" % lock)
+        locks_set.add(lock)
+
+    def __enter__(self):
+        return
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_tb:
+            log.error(traceback.format_exc(exc_tb))
+        self.__partial()
+
+
+class SetLocker(object):
+    def __init__(self, locks_set=None):
+        if locks_set is None:
+            self.__locks = set([])
+        else:
+            assert isinstance(locks_set, set)
+            self.__locks = locks_set
+
+    def __call__(self, lock):
+        return Lock(self.__locks, lock)
+
+
+class ClientException(Exception):
+    pass
+
+class ConnectionClosed(Exception):
+    pass
+
+class PingTimeoutError(Exception):
+    pass
+
+
+class WebSocketBase(tornado.websocket.WebSocketHandler):
     # Overlap this class property after import
     ROUTES = {
         'ping': ping
@@ -40,11 +101,9 @@ class WebSocket(tornado.websocket.WebSocketHandler):
     _KEEPALIVE_PING_TIMEOUT = 30
     _CLIENT_TIMEOUT = 10
 
-    THREAD_POOL = ThreadPool(10 if cpu_count() < 10 else cpu_count() * 2)
-
     def _execute(self, transforms, *args, **kwargs):
         if self.authorize():
-            return super(WebSocket, self)._execute(transforms, *args, **kwargs)
+            return super(WebSocketBase, self)._execute(transforms, *args, **kwargs)
         else:
             self.stream.write(tornado.escape.utf8(
                 "HTTP/1.1 403 Forbidden\r\n\r\n"
@@ -88,26 +147,19 @@ class WebSocket(tornado.websocket.WebSocketHandler):
         return inflated
 
     def __init__(self, *args, **kwargs):
-        super(WebSocket, self).__init__(*args, **kwargs)
+        super(WebSocketBase, self).__init__(*args, **kwargs)
         self.__handlers = {}
         self.store = {}
         self.serial = 0
-        self.locks = set([])
+        self.lock = SetLocker()
         self.extensions = self.request.headers.get('Sec-Websocket-Extensions', '')
         self._deflate = True if 'deflate' in self.extensions else False
+        self._ping = {}
 
     @classmethod
     def broadcast(cls, func, callback=WebSocketRoute.placebo, **kwargs):
-        for client_id, client in cls._CLIENTS.iteritems():
+        for client_id, client in iteritems(cls._CLIENTS):
             client.call(func, callback, **kwargs)
-
-    @classmethod
-    def _run_background(cls, func, callback, args=(), kwargs={}):
-        cls.THREAD_POOL.apply_async(
-            func, args, kwargs,
-            lambda future: tornado.ioloop.IOLoop.instance().add_callback(partial(callback, future))
-        )
-        log.debug('Queued in thread pool "%r"', cls.THREAD_POOL)
 
     def _get_id(self):
         self.id = str(uuid.uuid4())
@@ -115,52 +167,35 @@ class WebSocket(tornado.websocket.WebSocketHandler):
     def _log_client_list(self):
         log.debug(Lazy(lambda: 'CLIENTS: {0}'.format(''.join(['\n\t%r' % i for i in self._CLIENTS.values()]))))
 
-    @classmethod
     def on_pong(self, data):
-        log.info('Unexpected pong from "%r"', self)
+        future = self._ping.pop(data)
+        future.set_result({'seq': struct.unpack('>q', data)[0]})
 
-    @classmethod
-    def _cleanup(cls):
-        def timeout_waiter(socket, timeout):
-            flags = []
-
-            def _ping_waiter(data):
-                flags.append(True)
-                log.debug('Socket "%r" ping OK', socket)
-
-            def _timeout():
-                if not flags:
-                    try:
-                        log.warning('Socket "%r" must be closed', socket)
-                        socket.close()
-                    except Exception as e:
-                        log.debug(Lazy(lambda: traceback.format_exc()))
-                        log.error("%r", e)
-                if hasattr(socket, 'on_pong'):
-                    delattr(socket, 'on_pong')
-
-            tornado.ioloop.IOLoop.instance().call_later(timeout, _timeout)
-            return _ping_waiter
-
-        def do_ping(socket):
-            if isinstance(socket.ws_connection, tornado.websocket.WebSocketProtocol13):
-                socket.ping("\0" * 8)
-                socket.on_pong = timeout_waiter(socket, cls._CLIENT_TIMEOUT)
+    @tornado.gen.coroutine
+    def _send_ping(self):
+        if self.ws_connection:
+            ioloop = tornado.ioloop.IOLoop.instance()
+            if isinstance(self.ws_connection, tornado.websocket.WebSocketProtocol13):
+                future = tornado.gen.Future()
+                seq = struct.pack(">q", int(time.time() * 1000))
+                self._ping[seq] = future
+                self.ping(seq)
             else:
-                socket.call('ping', data="ping", callback=timeout_waiter(socket, cls._CLIENT_TIMEOUT))
-                sleep(cls._CLIENT_TIMEOUT)
+                future = self.call('ping', seq=time.time())
 
-        for sid, socket in cls._CLIENTS.iteritems():
-            try:
-                do_ping(socket)
-            except tornado.websocket.WebSocketClosedError:
-                socket.close()
-                log.warning('Auto close dead socket: %r', socket)
-            except Exception as e:
-                log.debug(Lazy(lambda: traceback.format_exc()))
-                log.error('%r', e)
+            ioloop.call_later(
+                self._KEEPALIVE_PING_TIMEOUT,
+                lambda: self.close() if future.running() else None
+            )
 
-        log.debug('Cleanup loop is OK.')
+            resp = yield future
+            ts = resp.get('seq', 0)
+            delta = (time.time() - (ts/1000.))
+            log.debug("%r Pong recieved: %.4f" % (self, delta))
+            if delta > self._CLIENT_TIMEOUT:
+                self.close()
+
+            ioloop.call_later(self._KEEPALIVE_PING_TIMEOUT, self._send_ping)
 
     def _to_json(self, **kwargs):
         return json.dumps(kwargs, default=repr, sort_keys=False, indent=None, ensure_ascii=False, encoding='utf-8')
@@ -177,7 +212,9 @@ class WebSocket(tornado.websocket.WebSocketHandler):
         raise NotImplementedError('Callback function not implemented')
 
     def open(self):
-        tornado.ioloop.IOLoop.instance().call_later(0, lambda: log.info('Client connected: {0}'.format(self)))
+        ioloop = tornado.ioloop.IOLoop.instance()
+        ioloop.call_later(self._KEEPALIVE_PING_TIMEOUT, self._send_ping)
+        ioloop.add_callback(lambda: log.info('Client connected: {0}'.format(self)))
         self._get_id()
         self._CLIENTS[self.id] = self
         self._log_client_list()
@@ -199,113 +236,82 @@ class WebSocket(tornado.websocket.WebSocketHandler):
             raise NotImplementedError('Method call of {0} is not implemented'.format(repr(callee)))
 
     def on_close(self):
-        try:
+            ioloop = tornado.ioloop.IOLoop.instance()
             if self._CLIENTS.has_key(self.id):
                 self._CLIENTS.pop(self.id)
-            for name, obj in self.__handlers.iteritems():
-                try:
-                    obj._onclose()
-                except:
-                    if log.level == logging.DEBUG:
-                        print traceback.format_exc()
+            for name, obj in iteritems(self.__handlers):
+                ioloop.add_callback(obj._onclose)
 
             log.info('Client "{0}" disconnected'.format(self.id))
-        except Exception as e:
-            log.debug(Lazy(lambda : traceback.format_exc()))
-            log.error(Lazy(lambda : repr(e)))
 
+    @tornado.gen.coroutine
     def on_message(self, message):
         log.debug(Lazy(lambda: u'Client {0} send message: "{1}"'.format(self.id, message)))
 
         # deserialize message
         data = self._data_load(message)
+        serial = data.get('serial', -1)
+        type = data.get('type', 'call')
+
+        assert serial >= 0
+
         try:
-            # get fields
-            type = data.get('type', 'call')
             if type == 'call':
-                self._local_call(data)
+                with self.lock(serial):
+                    args, kwargs = self._prepare_args(data.get('arguments', None))
+
+                    callback = data.get('call', None)
+                    if callback is None:
+                        raise ValueError('Require argument "call" does\'t exist.')
+
+                    callee = self.resolver(callback)
+                    calee_is_route = hasattr(callee, '__self__') and isinstance(callee.__self__, WebSocketRoute)
+                    args = args if calee_is_route else [self, ].extend(args)
+
+                    try:
+                        result = yield self._executor(partial(callee, *args, **kwargs))
+                        self._send(data=result, serial=serial, type='callback')
+                    except Exception as e:
+                        log.exception(e)
+                        self._send(data=repr(e), serial=serial, type='error')
+
             elif type == 'callback':
-                self._call_callback(data.get('data', None), data.get('serial', None))
+                serial = data.get('serial', -1)
+                assert serial >= 0
+
+                with self.lock(serial):
+                    cb = self.store.get(serial)
+                    cb.set_result(data.get('data', None))
+
             elif type == 'error':
+                self._reject(data.get('serial', -1), data.get('data', None))
                 log.error('Client return error: \n\t{0}'.format(data.get('data', None)))
         except Exception as e:
-            log.error(traceback.format_exc)
-            return self._send(data=str(e), serial=data.get('serial', -1), type='error')
+            self._send(data=repr(e), serial=serial, type='error')
 
-    def _call_callback(self, data, serial):
-        if serial in self.locks:
-            log.error('Duplicate serial call, callback droped.')
-            return
-        self.locks.add(serial)
-        args = []
-        kwargs = {}
-        if isinstance(data, list):
-            args.extend(data)
-        if isinstance(data, dict):
-            kwargs.update(data)
-        else:
-            args.append(data)
+    def _reject(self, serial, error):
+        future = self.store.get(serial)
+        if future:
+            future.set_exception(ClientException(error))
 
-        cb = self.store.get(serial)
-        if hasattr(cb, '__call__'):
-            cb(*args, **kwargs)
-        else:
-            raise ValueError('Callback not callable')
-
-        self.locks.remove(serial)
-
-    def _local_call(self, data):
-        serial = data.get('serial', -1)
-        if serial >= 0:
-            if serial in self.locks:
-                log.error('Duplicate serial call, call droped.')
-                return
-            self.locks.add(serial)
-
-        arguments = data.get('arguments', None)
-        callback = data.get('call', None)
-        if callback is None:
-            # require argument not exist
-            raise ValueError('Require argument "call" does\'t exist.')
-
-        callee = self.resolver(callback)
-
-        args = [] if hasattr(callee, '__self__') and isinstance(callee.__self__, WebSocketRoute) else [self, ]
+    def _prepare_args(self, args):
+        arguments = []
         kwargs = {}
 
-        # check type of arguments
-        if isinstance(arguments, list):
-            args.extend(arguments)
-        elif isinstance(arguments, dict):
-            kwargs = arguments
-        elif isinstance(arguments, type(None)):
-            pass
+        if isinstance(args, types.NoneType):
+            return arguments, kwargs
+
+        if isinstance(args, list):
+            arguments.extend(args)
+        elif isinstance(args, dict):
+            kwargs.update(args)
         else:
-            raise ValueError('Arguments must be object or array.')
+            arguments.append(args)
 
-        self.async_response(callee, serial, args, kwargs)
+        return arguments, kwargs
 
-    def async_response(self, func, serial, args, kwargs):
-        def responder(data):
-            if isinstance(data, Exception):
-                log.error(repr(data))
-                self.locks.remove(serial)
-                return self._send(data=repr(data), serial=serial, type='error')
-            elif isinstance(data, tornado.gen.Future):
-                if data.running():
-                    data.add_done_callback(response)
-                else:
-                    return responder(data.result())
-            else:
-                self.locks.remove(serial)
-                return self._send(data=data, serial=serial, type='callback')
-
-        self._run_background(
-            log_thread_exceptions(func),
-            responder,
-            args=args,
-            kwargs=kwargs
-        )
+    def _executor(self, func):
+        raise NotImplementedError(":-(")
 
     def _send(self, **kwargs):
         try:
@@ -316,11 +322,17 @@ class WebSocket(tornado.websocket.WebSocketHandler):
         except tornado.websocket.WebSocketClosedError:
             self.close()
 
+    def call(self, func, callback=None, **kwargs):
+        future = tornado.gen.Future()
+        if callback is not None and not isinstance(callback, tornado.gen.Future):
+            future.add_done_callback(callback)
 
-    def call(self, func, callback=WebSocketRoute.placebo, **kwargs):
         self.serial += 2
-        self.store[self.serial] = callback
+        self.store[self.serial] = future
         self._send(serial=self.serial, type='call', call=func, arguments=kwargs)
+
+        if callback is None:
+            return future
 
     def __repr__(self):
         if hasattr(self, 'id'):
@@ -329,17 +341,64 @@ class WebSocket(tornado.websocket.WebSocketHandler):
             return "<RPCWebsocket: {0} (waiting)>".format(self.__hash__())
 
     def close(self):
-        super(WebSocket, self).close()
-        # Very strange. I think this is mistake of tornado developers. Correct me when I wasn't right.
-        # TODO: TRY MAKE IT RIGHT!!! This is awful!!!
-        try:
-            self.on_close()
-        except:
-            pass
+        super(WebSocketBase, self).close()
+        ioloop = tornado.ioloop.IOLoop.instance()
+
+        for future in self.store.values():
+            ioloop.add_callback(partial(future.set_exception, ConnectionClosed))
+
+        ioloop.add_callback(lambda: self.on_close() if self.ws_connection else None)
 
     @classmethod
-    def cleapup_worker(cls):
+    def cleanup_worker(cls):
+        log.warning("Method 'cleanup_worker' deprecated")
+
+class WebSocket(WebSocketBase):
+    def _executor(self, func):
+        future = tornado.gen.Future()
+
+        @tornado.gen.coroutine
         def run():
-            cls.THREAD_POOL.apply_async(cls._cleanup)
-            tornado.ioloop.IOLoop.instance().call_later(cls._KEEPALIVE_PING_TIMEOUT, run)
-        tornado.ioloop.IOLoop.instance().call_later(0, run)
+            try:
+                result = func()
+            except tornado.gen.Return as e:
+                future.set_result(e.value)
+            except Exception as e:
+                log.exception(e)
+                future.set_exception(e)
+            else:
+                if isinstance(result, tornado.gen.Future):
+                    result = yield result
+
+                future.set_result(result)
+
+        tornado.ioloop.IOLoop.instance().add_callback(run)
+        return future
+
+
+
+
+class WebSocketThreaded(WebSocketBase):
+    @classmethod
+    def init_pool(cls, pool=None):
+        if not pool:
+            pool = ThreadPool(cpu_count())
+        cls._thread_pool = pool
+
+    def _executor(self, func):
+        future = tornado.gen.Future()
+
+        def responder(result):
+            if isinstance(result, Exception):
+                future.set_exception(result)
+            else:
+                future.set_result(result)
+
+        self._thread_pool.apply_async(
+            log_thread_exceptions(func), args=(), kwds={},
+            callback=lambda result: tornado.ioloop.IOLoop.instance().add_callback(partial(responder, result))
+        )
+        log.debug('Queued in thread pool "%r"', self._thread_pool)
+
+        return future
+

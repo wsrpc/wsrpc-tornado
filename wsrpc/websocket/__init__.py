@@ -1,1 +1,1 @@
-from wsrpc.websocket.handler import WebSocketRoute, WebSocket
+from wsrpc.websocket.handler import WebSocketRoute, WebSocket, WebSocketThreaded
