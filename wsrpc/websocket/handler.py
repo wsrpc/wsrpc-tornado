@@ -32,10 +32,7 @@ else:
     def iteritems(d):
         return d.iteritems()
 
-try:
-    import ujson as json
-except ImportError:
-    import json
+import ujson as json
 
 class Lazy(object):
     def __init__(self,func):
@@ -198,7 +195,7 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
             ioloop.call_later(self._KEEPALIVE_PING_TIMEOUT, self._send_ping)
 
     def _to_json(self, **kwargs):
-        return json.dumps(kwargs, default=repr, sort_keys=False, indent=None, ensure_ascii=False, encoding='utf-8')
+        return json.dumps(kwargs, ensure_ascii=False)
 
     def _data_load(self, data_string):
         try:
