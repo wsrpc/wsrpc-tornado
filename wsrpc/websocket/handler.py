@@ -102,10 +102,7 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
         if self.authorize():
             return super(WebSocketBase, self)._execute(transforms, *args, **kwargs)
         else:
-            return self.finish(tornado.escape.utf8(
-                "HTTP/1.1 403 Forbidden\r\n\r\n"
-                "Access deny to \"WebSocket\"."
-            ))
+            return self.send_error(403)
 
     def authorize(self):
         return True
