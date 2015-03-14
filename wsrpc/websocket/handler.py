@@ -102,7 +102,14 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
         if self.authorize():
             return super(WebSocketBase, self)._execute(transforms, *args, **kwargs)
         else:
-            return self.send_error(403)
+            if self._transforms is None:
+                self._transforms = []
+
+            f = tornado.gen.Future()
+            def resolve():
+                f.set_result(self.send_error(403))
+            tornado.ioloop.IOLoop.instance().add_callback(resolve)
+            return f
 
     def authorize(self):
         return True
