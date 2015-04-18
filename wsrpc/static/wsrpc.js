@@ -18,6 +18,15 @@
 			onchange: []
 		};
 
+		function serialize(obj) {
+			return new Uint8Array(msgpack.pack(obj));
+		}
+
+		function deserialize(message) {
+			var arr = new Uint8Array(message.data);
+			return msgpack.unpack(arr);
+		}
+
 		self.callQueue = [];
 		
 		var log = function (msg) {
@@ -37,7 +46,7 @@
 				if ('group' in console && 'groupEnd' in console && 'dir' in console) {
 					console.group('WSRPC.TRACE');
 					if ('data' in msg) {
-						console.dir(JSON.parse(msg.data));
+						console.dir(deserialize(msg));
 					} else {
 						console.dir(msg)
 					}
@@ -74,6 +83,7 @@
 
 		function createSocket (ev) {
 			var ws = new WebSocket(URL);
+			ws.binaryType = 'arraybuffer';
 
 			var rejectQueue = function () {
 				self.connectionNumber++; // rejects incoming calls
@@ -148,7 +158,7 @@
 				trace(ev);
 
 				while (0 < self.callQueue.length) {
-					self.socket.send(JSON.stringify(self.callQueue.shift(), 0, 1));
+					self.socket.send(serialize(self.callQueue.shift()));
 				}
 
 				callEvents('onconnect', ev);
@@ -161,7 +171,7 @@
 				var data = null;
 				if (message.type == 'message') {
 					try {
-						data = JSON.parse(message.data);
+						data = deserialize(message);
 						log(data.data);
 						if (data.hasOwnProperty('type') && data.type === 'call') {
 							if (!self.routes.hasOwnProperty(data.call)) {
@@ -171,7 +181,7 @@
 							var connectionNumber = self.connectionNumber;
 							Q(self.routes[data.call](data.arguments)).then(function(promisedResult) {
 								if (connectionNumber == self.connectionNumber) {
-									self.socket.send(JSON.stringify({
+									self.socket.send(serialize({
 										serial: data.serial,
 										type: 'callback',
 										data: promisedResult
@@ -208,7 +218,7 @@
 							serial: data?data.serial:null
 						};
 
-						self.socket.send(JSON.stringify(err));
+						self.socket.send(serialize(err));
 						log(exception.stack);
 					}
 				}
@@ -220,7 +230,7 @@
 		var makeCall = function (func, args, params) {
 			self.serial += 2;
 			var deferred = Q.defer();
-			
+
 			var callObj = {
 				serial: self.serial,
 				call: func,
@@ -232,7 +242,7 @@
 
 			if (state === 'OPEN') {
 				self.store[self.serial] = deferred;
-				self.socket.send(JSON.stringify(callObj));
+				self.socket.send(serialize(callObj));
 			} else if (state === 'CONNECTING') {
 				log('SOCKET IS: ' + state);
 				self.store[self.serial] = deferred;
