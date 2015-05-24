@@ -1,6 +1,4 @@
 # encoding: utf-8
-from multiprocessing.pool import ThreadPool
-from multiprocessing import cpu_count
 import zlib
 import time
 import traceback
@@ -11,6 +9,9 @@ import tornado.ioloop
 import tornado.escape
 import tornado.gen
 import types
+import tornado.concurrent
+from multiprocessing.pool import ThreadPool
+from multiprocessing import cpu_count
 from functools import partial
 from tornado.log import app_log as log
 from .route import WebSocketRoute
@@ -352,6 +353,7 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
     def cleanup_worker(cls):
         log.warning("Method 'cleanup_worker' deprecated")
 
+
 class WebSocket(WebSocketBase):
     def _executor(self, func):
         future = tornado.gen.Future()
@@ -371,33 +373,22 @@ class WebSocket(WebSocketBase):
 
                 future.set_result(result)
 
-        tornado.ioloop.IOLoop.instance().add_callback(run)
+        tornado.ioloop.IOLoop.current().add_callback(run)
         return future
-
-
 
 
 class WebSocketThreaded(WebSocketBase):
+    _thread_pool = None
+
     @classmethod
-    def init_pool(cls, pool=None):
-        if not pool:
-            pool = ThreadPool(cpu_count())
-        cls._thread_pool = pool
+    def init_pool(cls, workers=cpu_count()):
+        def init():
+            cls._thread_pool = tornado.concurrent.futures.ThreadPoolExecutor(workers)
+
+        tornado.ioloop.IOLoop.current().add_callback(init)
 
     def _executor(self, func):
-        future = tornado.gen.Future()
+        if not self._thread_pool:
+            self.init_pool()
 
-        def responder(result):
-            if isinstance(result, Exception):
-                future.set_exception(result)
-            else:
-                future.set_result(result)
-
-        self._thread_pool.apply_async(
-            log_thread_exceptions(func), args=(), kwds={},
-            callback=lambda result: tornado.ioloop.IOLoop.instance().add_callback(partial(responder, result))
-        )
-        log.debug('Queued in thread pool "%r"', self._thread_pool)
-
-        return future
-
+        return self._thread_pool.submit(log_thread_exceptions(func))
