@@ -13,6 +13,5 @@ def log_thread_exceptions(func):
                 log.debug('Exception: {exc}\n\tfunc: {func}\n\t*args: {args}\n\t**kwargs: {kw}\n{tr}'.format(
                     exc=repr(e), args=repr(args), kw=repr(kwargs), func=repr(func), tr=traceback.format_exc()
                 ))
-            return e
-
+            raise
     return wrap
