@@ -10,7 +10,6 @@ import tornado.escape
 import tornado.gen
 import types
 import tornado.concurrent
-from multiprocessing.pool import ThreadPool
 from multiprocessing import cpu_count
 from functools import partial
 from tornado.log import app_log as log
@@ -316,8 +315,7 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
     def _send(self, **kwargs):
         try:
             data = self._to_json(**kwargs)
-            log.debug(Lazy(lambda: "Sending message to {0}: {1}".format(self.id, json.dumps(data))))
-            log.info(Lazy(lambda: "Sending message {2} to {0} length {1}".format(self.id, len(data), kwargs.get('serial'))))
+            log.debug("Sending message to %s serial %s: %s", self.id, Lazy(lambda: kwargs.get('serial')), data)
             self.write_message(data, binary=False)
         except tornado.websocket.WebSocketClosedError:
             self.close()
