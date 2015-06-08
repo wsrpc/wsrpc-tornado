@@ -315,7 +315,12 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
     def _send(self, **kwargs):
         try:
             data = self._to_json(**kwargs)
-            log.debug("Sending message to %s serial %s: %s", self.id, Lazy(lambda: kwargs.get('serial')), data)
+            log.debug(
+                "Sending message to %s serial %s: %s",
+                Lazy(lambda: str(self.id)),
+                Lazy(lambda: str(kwargs.get('serial'))),
+                Lazy(lambda: str(data))
+              )
             self.write_message(data, binary=False)
         except tornado.websocket.WebSocketClosedError:
             self.close()
