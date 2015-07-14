@@ -358,26 +358,13 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
 
 
 class WebSocket(WebSocketBase):
+    @tornado.gen.coroutine
     def _executor(self, func):
-        future = tornado.gen.Future()
+        result = func()
+        if isinstance(result, tornado.gen.Future):
+            result = yield result
 
-        @tornado.gen.coroutine
-        def run():
-            try:
-                result = func()
-            except tornado.gen.Return as e:
-                future.set_result(e.value)
-            except Exception as e:
-                log.exception(e)
-                future.set_exception(e)
-            else:
-                if isinstance(result, tornado.gen.Future):
-                    result = yield result
-
-                future.set_result(result)
-
-        tornado.ioloop.IOLoop.current().add_callback(run)
-        return future
+        raise tornado.gen.Return(result)
 
 
 class WebSocketThreaded(WebSocketBase):
