@@ -76,6 +76,9 @@ class TestRoute(WebSocketRoute):
     def _secure_method(self):
         return 'WTF???'
 
+    def exc(self):
+        raise Exception("Test")
+
     @tornado.gen.coroutine
     def getJoke(self):
         joke = self.JOKES[randint(0, len(self.JOKES) - 1)]

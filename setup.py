@@ -27,5 +27,5 @@ setup(
     long_description=open('README.rst').read(),
     packages=['wsrpc', 'wsrpc.websocket',],
     package_data={ 'wsrpc': ['static/*'], },
-    install_requires = ['tornado', 'futures', 'ujson'],
+    install_requires=['tornado>=4.2', 'futures'],
 )

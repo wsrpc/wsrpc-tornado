@@ -11,6 +11,12 @@ Install via pip::
     pip install wsrpc-tornado
 
 
+Install ujson if you want::
+
+    pip install ujson
+
+
+
 Simple usage
 ------------
 
