@@ -69,6 +69,22 @@ Add the frontend side::
         RPC.call('test2').then(function (data) { console.log(data); }).done();
     </script>
 
+Reverse call from Server to Client
+----------------------------------
+backend::
+
+        def do_notify(self):
+            awesome = 'Notification for you!'
+            yield self.socket.call('notify', result=awesome)
+
+frontend::
+
+    <script>
+        var url = window.location.protocol==="https:"?"wss://":"ws://" + window.location.host + '/ws/';
+        RPC = WSRPC(url, 5000);
+        RPC.addRoute('notify', function (data) { return data.result; });
+        RPC.connect();
+    </script>
 
 Example
 +++++++
