@@ -42,7 +42,6 @@ class WebSocketRoute(object):
 
     def _onclose(self):
         pass
-        #raise RuntimeError("Method _onclose, must be overlapped")
 
     @classmethod
     def placebo(*args, **kwargs):
