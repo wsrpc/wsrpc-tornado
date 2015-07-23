@@ -77,7 +77,7 @@ class TestRoute(WebSocketRoute):
         return 'WTF???'
 
     def exc(self):
-        raise Exception("Test")
+        raise Exception(u"Test Тест テスト 测试")
 
     @tornado.gen.coroutine
     def getJoke(self):

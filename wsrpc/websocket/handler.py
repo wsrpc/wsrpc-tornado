@@ -161,7 +161,7 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
             self.ioloop.call_later(self._KEEPALIVE_PING_TIMEOUT, self._send_ping)
 
     def _to_json(self, **kwargs):
-        return json.dumps(kwargs, ensure_ascii=False, encoding='utf-8')
+        return json.dumps(kwargs, ensure_ascii=False)
 
     def _data_load(self, data_string):
         try:
