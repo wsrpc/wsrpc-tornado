@@ -1,5 +1,5 @@
 # encoding: utf-8
-from collections import defaultdict
+import logging
 import zlib
 import time
 import traceback
@@ -11,10 +11,10 @@ import tornado.escape
 import tornado.gen
 import types
 import tornado.concurrent
+from collections import defaultdict
 from tornado.locks import Semaphore
 from multiprocessing import cpu_count
 from functools import partial
-from tornado.log import app_log as log
 from .route import WebSocketRoute
 from .common import log_thread_exceptions
 
@@ -24,6 +24,11 @@ except ImportError:
     import json
 
 from tools import iteritems, Lazy
+
+
+global_log = logging.getLogger("wsrpc")
+log = logging.getLogger("wsrpc.handler")
+
 
 def ping(obj, *args, **kwargs):
     return 'pong'
@@ -167,8 +172,8 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
         try:
             return json.loads(data_string)
         except Exception as e:
-            log.debug(Lazy(lambda: traceback.format_exc()))
-            log.error('Parsing message error: %s', Lazy(lambda: repr(e)))
+            global_log.debug(Lazy(lambda: traceback.format_exc()))
+            global_log.error('Parsing message error: %s', Lazy(lambda: repr(e)))
             raise e
 
     def _unresolvable(self, *args, **kwargs):

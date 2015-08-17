@@ -2,7 +2,9 @@
 
 import logging
 import traceback
-from tornado.log import app_log as log
+
+log = logging.getLogger("wsrpc.handler")
+
 
 def log_thread_exceptions(func):
     def wrap(*args, **kwargs):

@@ -1,5 +1,8 @@
 # encoding: utf-8
-from tornado.log import app_log as log
+import logging
+
+
+log = logging.getLogger("wsrpc")
 
 
 class decorators(object):
