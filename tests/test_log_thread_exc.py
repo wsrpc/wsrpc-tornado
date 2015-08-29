@@ -4,8 +4,12 @@ from tornado.testing import AsyncTestCase
 from wsrpc.websocket.common import log_thread_exceptions
 
 
+class TestExc(Exception):
+    pass
+
+
 def exc_func():
-    raise Exception("Test")
+    raise TestExc("Test")
 
 
 def test():
@@ -16,8 +20,8 @@ class TestLogThreadException(AsyncTestCase):
     def test_exc(self):
         try:
             log_thread_exceptions(exc_func)()
-        except Exception as e:
-            self.assertEqual(e.message, "Test")
+        except TestExc:
+            pass
 
     def test_func(self):
         log_thread_exceptions(test)()

@@ -23,7 +23,12 @@ try:
 except ImportError:
     import json
 
-from tools import iteritems, Lazy
+from .tools import iteritems, Lazy
+
+try:
+    unicode()
+except NameError:
+    unicode = str
 
 
 global_log = logging.getLogger("wsrpc")
@@ -37,8 +42,10 @@ def ping(obj, *args, **kwargs):
 class ClientException(Exception):
     pass
 
+
 class ConnectionClosed(Exception):
     pass
+
 
 class PingTimeoutError(Exception):
     pass
@@ -213,7 +220,7 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
 
     @tornado.gen.coroutine
     def on_message(self, message):
-        log.debug(u'Client %s send message: "%s"', self.id, message)
+        log.debug('Client %s send message: "%s"', self.id, message)
 
         # deserialize message
         data = self._data_load(message)
@@ -274,7 +281,7 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
         arguments = []
         kwargs = {}
 
-        if isinstance(args, types.NoneType):
+        if isinstance(args, type(None)):
             return arguments, kwargs
 
         if isinstance(args, list):

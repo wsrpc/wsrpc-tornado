@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # encoding: utf-8
+import codecs
 import os
 from tornado.gen import coroutine
 import tornado.web
@@ -9,6 +10,12 @@ from tornado.httpserver import HTTPServer
 from tornado.testing import gen_test, AsyncTestCase
 from wsrpc import wsrpc_static
 from tornado.httpclient import AsyncHTTPClient
+
+
+try:
+    unicode()
+except NameError:
+    unicode = str
 
 
 class Application(tornado.web.Application):
@@ -33,7 +40,10 @@ class WebTest(AsyncTestCase):
     def fetch(self, filename):
         response = yield AsyncHTTPClient().fetch("http://localhost:{0.port}/static/{1}".format(self, filename))
         self.assertTrue(response.code, 200)
-        self.assertEqual(response.body, open(os.path.join(self.static_path, filename)).read())
+        self.assertEqual(
+            response.body.decode('utf-8'),
+            codecs.open(os.path.join(self.static_path, filename), 'r', 'utf-8').read()
+        )
 
     @gen_test
     def test_wsrpc_js(self):

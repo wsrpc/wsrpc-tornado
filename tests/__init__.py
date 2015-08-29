@@ -1,14 +1,21 @@
 #!/usr/bin/env python
 # encoding: utf-8
+from __future__ import absolute_import
+
 from tornado.gen import Return, Future, sleep, coroutine
 import tornado.web
-import exceptions
+
+try:
+    import exceptions
+except ImportError:
+    import builtins as exceptions
+
 from tornado import testing, websocket
 from tornado.httpserver import HTTPServer
 from wsrpc import WebSocket, WebSocketThreaded
 
-import async
-import sync
+from .async import TestRoute as TestAsyncRoute
+from .sync import TestRoute as TestSyncRoute
 
 try:
     import ujson as json
@@ -87,7 +94,7 @@ class TestBase(testing.AsyncTestCase):
         )
 
     def call(self, func, **kwargs):
-        assert isinstance(func, (basestring, unicode))
+        assert isinstance(func, str)
 
         serial = self._get_serial()
 
