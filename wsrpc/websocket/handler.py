@@ -70,6 +70,7 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
 
             def resolve():
                 f.set_result(self.send_error(403))
+
             tornado.ioloop.IOLoop.instance().add_callback(resolve)
             return f
 
@@ -232,7 +233,10 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
 
                     callee = self.resolver(callback)
                     calee_is_route = hasattr(callee, '__self__') and isinstance(callee.__self__, WebSocketRoute)
-                    args = args if calee_is_route else [self, ].extend(args)
+                    if not calee_is_route:
+                        a = [self,]
+                        a.extend(args)
+                        args = a
 
                     result = yield self._executor(partial(callee, *args, **kwargs))
                     self._send(data=result, serial=serial, type='callback')
@@ -343,10 +347,7 @@ class WebSocketThreaded(WebSocketBase):
 
     @classmethod
     def init_pool(cls, workers=cpu_count()):
-        def init():
-            cls._thread_pool = tornado.concurrent.futures.ThreadPoolExecutor(workers)
-
-        tornado.ioloop.IOLoop.current().add_callback(init)
+        cls._thread_pool = tornado.concurrent.futures.ThreadPoolExecutor(workers)
 
     def _executor(self, func):
         if not self._thread_pool:

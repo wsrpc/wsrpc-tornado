@@ -7,6 +7,7 @@ from websocket.route import decorators
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
 
+
 def wsrpc_static(url):
     return (
         url,

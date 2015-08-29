@@ -12,8 +12,14 @@ def log_thread_exceptions(func):
             return func(*args, **kwargs)
         except Exception as e:
             if log.getEffectiveLevel() == logging.DEBUG:
-                log.debug('Exception: {exc}\n\tfunc: {func}\n\t*args: {args}\n\t**kwargs: {kw}\n{tr}'.format(
-                    exc=repr(e), args=repr(args), kw=repr(kwargs), func=repr(func), tr=traceback.format_exc()
-                ))
+                log.debug(
+                    'Exception: {exc}\n\tfunc: {func}\n\t*args: {args}\n\t**kwargs: {kw}\n{tr}'.format(
+                        exc=repr(e),
+                        args=repr(args),
+                        kw=repr(kwargs),
+                        func=repr(func),
+                        tr=traceback.format_exc()
+                    )
+                )
             raise
     return wrap
