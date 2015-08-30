@@ -1,6 +1,9 @@
 WSRPC Tornado
 =============
 
+.. image:: https://travis-ci.org/mosquito/wsrpc.svg
+    :target: https://travis-ci.org/mosquito/wsrpc
+
 Remote Procedure call through WebSocket between browser and tornado.
 
 Installation
