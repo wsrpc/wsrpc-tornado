@@ -78,10 +78,20 @@
 			var rejectQueue = function () {
 				self.connectionNumber++; // rejects incoming calls
 
+				//reject all pending calls
 				while (0 < self.callQueue.length) {
 					var callObj = self.callQueue.shift();
 					var deferred = self.store[callObj.serial];
 					delete self.store[callObj.serial];
+
+					if (deferred && deferred.promise.isPending()) {
+						deferred.reject('WebSocket error occurred');
+					}
+				}
+
+				// reject all from the store
+				for (var key in self.store) {
+					var deferred = self.store[key];
 
 					if (deferred && deferred.promise.isPending()) {
 						deferred.reject('WebSocket error occurred');

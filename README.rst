@@ -75,7 +75,7 @@ Add the backend side::
     # stateless request
     WebSocket.ROUTES['test2'] = lambda *a, **kw: True
 
-    # initialize ThreadPool
+    # initialize ThreadPool. Needed when using WebSocketThreaded.
     WebSocket.init_pool()
 
 
