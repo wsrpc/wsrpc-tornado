@@ -7,7 +7,7 @@ except ImportError:
     from distutils.core import setup
 
 
-__version__ = '0.5.2'
+__version__ = '0.5.3'
 __author__ = 'Dmitry Orlov <me@mosquito.su>'
 
 
@@ -19,7 +19,7 @@ setup(
     license="LGPLv3",
     description="WSRPC WebSocket RPC for tornado",
     platforms="all",
-    url="http://github.com/mosquito/wsrpc",
+    url="https://github.com/wsrpc/wsrpc-tornado",
     classifiers=[
         'Environment :: Console',
         'Programming Language :: Python',
