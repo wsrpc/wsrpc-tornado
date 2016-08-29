@@ -1,0 +1,12 @@
+application: wsrpc-example
+version: 2
+runtime: python27
+api_version: 1
+threadsafe: yes
+
+handlers:
+- url: /static/
+  static_dir: static
+
+- url: /.*
+  script: run.application

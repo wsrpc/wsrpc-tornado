@@ -6,6 +6,7 @@ import tornado.web
 import tornado.httpserver
 import tornado.ioloop
 import tornado.gen
+import tornado.wsgi
 
 from random import randint
 from time import sleep, time
@@ -101,3 +102,12 @@ def main():
 
 if __name__ == "__main__":
     exit(main())
+else:
+    try:
+        from google.appengine.ext import vendor
+        vendor.add('lib')
+
+    except ImportError:
+        pass
+
+    application = tornado.wsgi.WSGIAdapter(Application())

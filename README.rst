@@ -36,7 +36,10 @@ Install ujson if you want::
 Simple usage
 ------------
 
-Add the backend side::
+Add the backend side
+
+
+.. code-block:: python
 
     from time import time
     ## If you want write async tornado code import it
@@ -79,7 +82,11 @@ Add the backend side::
     WebSocket.init_pool()
 
 
-Add the frontend side::
+
+Add the frontend side
+
+
+.. code-block:: HTML
 
     <script type="text/javascript" src="/js/q.min.js"></script>
     <script type="text/javascript" src="/js/wsrpc.min.js"></script>
@@ -97,6 +104,7 @@ Add the frontend side::
 
         RPC.call('test2').then(function (data) { console.log(data); }).done();
     </script>
+
 
 
 Example
