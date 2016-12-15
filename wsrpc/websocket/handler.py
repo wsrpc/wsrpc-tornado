@@ -249,7 +249,7 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
                     self._send(data=result, serial=serial, type='callback')
 
                 elif msg_type == 'callback':
-                    cb = self.store.get(serial)
+                    cb = self.store.pop(serial, None)
                     cb.set_result(data.get('data', None))
 
                 elif msg_type == 'error':
