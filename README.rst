@@ -1,8 +1,22 @@
 WSRPC Tornado
 =============
 
-.. image:: https://travis-ci.org/mosquito/wsrpc.svg
-    :target: https://travis-ci.org/mosquito/wsrpc
+.. image:: https://travis-ci.org/wsrpc/wsrpc-tornado.svg
+    :target: https://travis-ci.org/wsrpc/wsrpc-tornado
+    :alt: Travis CI
+
+.. image:: https://img.shields.io/pypi/v/wsrpc-tornado.svg
+    :target: https://pypi.python.org/pypi/wsrpc-tornado/
+    :alt: Latest Version
+
+.. image:: https://img.shields.io/pypi/wheel/wsrpc-tornado.svg
+    :target: https://pypi.python.org/pypi/wsrpc-tornado/
+
+.. image:: https://img.shields.io/pypi/pyversions/wsrpc-tornado.svg
+    :target: https://pypi.python.org/pypi/wsrpc-tornado/
+
+.. image:: https://img.shields.io/pypi/l/wsrpc-tornado.svg
+    :target: https://pypi.python.org/pypi/wsrpc-tornado/
 
 Remote Procedure call through WebSocket between browser and tornado.
 
