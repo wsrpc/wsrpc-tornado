@@ -1,5 +1,5 @@
 # encoding: utf-8
-from collections import defaultdict
+import logging
 import zlib
 import time
 import traceback
@@ -11,10 +11,10 @@ import tornado.escape
 import tornado.gen
 import types
 import tornado.concurrent
+from collections import defaultdict
 from tornado.locks import Semaphore
 from multiprocessing import cpu_count
 from functools import partial
-from tornado.log import app_log as log
 from .route import WebSocketRoute
 from .common import log_thread_exceptions
 
@@ -23,7 +23,17 @@ try:
 except ImportError:
     import json
 
-from tools import iteritems, Lazy
+from .tools import iteritems, Lazy
+
+try:
+    unicode()
+except NameError:
+    unicode = str
+
+
+global_log = logging.getLogger("wsrpc")
+log = logging.getLogger("wsrpc.handler")
+
 
 def ping(obj, *args, **kwargs):
     return 'pong'
@@ -32,8 +42,10 @@ def ping(obj, *args, **kwargs):
 class ClientException(Exception):
     pass
 
+
 class ConnectionClosed(Exception):
     pass
+
 
 class PingTimeoutError(Exception):
     pass
@@ -65,6 +77,7 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
 
             def resolve():
                 f.set_result(self.send_error(403))
+
             tornado.ioloop.IOLoop.instance().add_callback(resolve)
             return f
 
@@ -167,8 +180,8 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
         try:
             return json.loads(data_string)
         except Exception as e:
-            log.debug(Lazy(lambda: traceback.format_exc()))
-            log.error('Parsing message error: %s', Lazy(lambda: repr(e)))
+            global_log.debug(Lazy(lambda: traceback.format_exc()))
+            global_log.error('Parsing message error: %s', Lazy(lambda: repr(e)))
             raise e
 
     def _unresolvable(self, *args, **kwargs):
@@ -207,7 +220,7 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
 
     @tornado.gen.coroutine
     def on_message(self, message):
-        log.debug(u'Client %s send message: "%s"', self.id, message)
+        log.debug('Client %s send message: "%s"', self.id, message)
 
         # deserialize message
         data = self._data_load(message)
@@ -227,13 +240,16 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
 
                     callee = self.resolver(callback)
                     calee_is_route = hasattr(callee, '__self__') and isinstance(callee.__self__, WebSocketRoute)
-                    args = args if calee_is_route else [self, ].extend(args)
+                    if not calee_is_route:
+                        a = [self,]
+                        a.extend(args)
+                        args = a
 
                     result = yield self._executor(partial(callee, *args, **kwargs))
                     self._send(data=result, serial=serial, type='callback')
 
                 elif msg_type == 'callback':
-                    cb = self.store.get(serial)
+                    cb = self.store.pop(serial, None)
                     cb.set_result(data.get('data', None))
 
                 elif msg_type == 'error':
@@ -254,7 +270,7 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
 
     @staticmethod
     def _format_error(e):
-        return {'type': type(e).__name__, 'message': str(e)}
+        return {'type': unicode(type(e).__name__), 'message': unicode(e)}
 
     def _reject(self, serial, error):
         future = self.store.get(serial)
@@ -265,7 +281,7 @@ class WebSocketBase(tornado.websocket.WebSocketHandler):
         arguments = []
         kwargs = {}
 
-        if isinstance(args, types.NoneType):
+        if isinstance(args, type(None)):
             return arguments, kwargs
 
         if isinstance(args, list):
@@ -338,10 +354,7 @@ class WebSocketThreaded(WebSocketBase):
 
     @classmethod
     def init_pool(cls, workers=cpu_count()):
-        def init():
-            cls._thread_pool = tornado.concurrent.futures.ThreadPoolExecutor(workers)
-
-        tornado.ioloop.IOLoop.current().add_callback(init)
+        cls._thread_pool = tornado.concurrent.futures.ThreadPoolExecutor(workers)
 
     def _executor(self, func):
         if not self._thread_pool:
