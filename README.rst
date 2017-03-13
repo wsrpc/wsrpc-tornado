@@ -121,16 +121,20 @@ Add the frontend side
 
 Reverse call from Server to Client
 ----------------------------------
-backend::
+backend:
+
+.. code-block:: python
 
         def do_notify(self):
             awesome = 'Notification for you!'
             yield self.socket.call('notify', result=awesome)
 
-frontend::
+frontend:
+
+.. code-block:: HTML
 
     <script>
-        var url = window.location.protocol==="https:"?"wss://":"ws://" + window.location.host + '/ws/';
+        var url = (window.location.protocol==="https:"?"wss://":"ws://") + window.location.host + '/ws/';
         RPC = WSRPC(url, 5000);
         RPC.addRoute('notify', function (data) { return data.result; });
         RPC.connect();
@@ -143,4 +147,4 @@ Example
 Example running there demo_.
 
 
-.. _demo: http://wsrpc.mosquito.su/
+.. _demo: https://demo.wsrpc.info/
