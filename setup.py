@@ -11,7 +11,7 @@ __version__ = '0.5.5'
 __author__ = 'Dmitry Orlov <me@mosquito.su>'
 
 
-requirements = ['tornado']
+requirements = ['tornado<4.5']
 
 if sys.version_info < (3,):
     requirements.append('futures')
