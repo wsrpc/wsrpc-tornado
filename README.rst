@@ -18,7 +18,10 @@ WSRPC Tornado
 .. image:: https://img.shields.io/pypi/l/wsrpc-tornado.svg
     :target: https://pypi.python.org/pypi/wsrpc-tornado/
 
-Remote Procedure call through WebSocket between browser and tornado.
+Easy to use minimal WebSocket Remote Procedure Call library for tornado
+servers. See online demo_.
+
+Also, there is `aiohttp WSRPC`_ implementation.
 
 Features
 --------
@@ -140,11 +143,6 @@ frontend:
         RPC.connect();
     </script>
 
-
-Example
-+++++++
-
-Example running there demo_.
-
-
 .. _demo: https://demo.wsrpc.info/
+
+.. _aiohttp WSRPC: https://github.com/wsrpc/wsrpc-aiohttp
